@@ -65,6 +65,13 @@ ENTRY(cmb_dissociation, INT, 0)
    0) off, 1) on */
 ENTRY(equilibrium_h2_intermediates, INT, 0)
 
+/* v2026 recfast-matched H recombination: k2 -> PPB91 alpha_B * Peebles C-factor
+   0) off, 1) on  (needs the cosmology_* parameters below for H(z)) */
+ENTRY(cmb_recombination, INT, 0)
+ENTRY(cosmology_hubble_constant_now, DOUBLE, 0.0)
+ENTRY(cosmology_omega_matter_now, DOUBLE, 0.0)
+ENTRY(cosmology_omega_lambda_now, DOUBLE, 0.0)
+
 /* adiabatic index */
 ENTRY(Gamma, DOUBLE, 5./3.)
 

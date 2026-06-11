@@ -90,6 +90,10 @@ c     This is the fortran definition of grackle_chemistry_data
          INTEGER(C_INT) :: cmb_temperature_floor
          INTEGER(C_INT) :: cmb_dissociation
          INTEGER(C_INT) :: equilibrium_h2_intermediates
+         INTEGER(C_INT) :: cmb_recombination
+         REAL(C_DOUBLE) :: cosmology_hubble_constant_now
+         REAL(C_DOUBLE) :: cosmology_omega_matter_now
+         REAL(C_DOUBLE) :: cosmology_omega_lambda_now
          REAL(C_DOUBLE) :: Gamma
          INTEGER(C_INT) :: h2_on_dust
          INTEGER(C_INT) :: use_dust_density_field

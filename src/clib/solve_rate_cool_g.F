@@ -47,7 +47,8 @@
      &                iVheat, iMheat, Vheat, Mheat,
      &                iisrffield, isrf_habing, 
      &                iH2shieldcustom, f_shield_custom,
-     &                itmax, exititmax)
+     &                itmax, exititmax,
+     &                icmbrec, hubble_z)
 
 !
 !  SOLVE MULTI-SPECIES RATE EQUATIONS AND RADIATIVE COOLING
@@ -169,11 +170,12 @@
      &        igammah, ih2optical, iciecool, ithreebody,
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
      &        iradtrans, iradcoupled, iradstep, irt_honly,
-     &        iisrffield, iH2shieldcustom, itmax, exititmax
+     &        iisrffield, iH2shieldcustom, itmax, exititmax,
+     &        icmbrec
 
       real*8  dx, dt, aye, temstart, temend, gamma,
-     &        utim, uxyz, uaye, urho, utem, fh, dtoh, z_solar, 
-     &        fgr, dtemstart, dtemend, clEleFra
+     &        utim, uxyz, uaye, urho, utem, fh, dtoh, z_solar,
+     &        fgr, dtemstart, dtemend, clEleFra, hubble_z
 
 !  Density, energy and velocity fields fields
 
@@ -527,8 +529,9 @@
      &               k31shield, h2dust, ncrn, ncrd1, ncrd2, 
      &               t1, t2, tdef, logtem, indixe, 
      &               dom, coolunit, tbase1, xbase1, dx_cgs, c_ljeans,
-     &               iradtrans, kdissH2I, xH2shield, iH2shieldcustom, 
-     &               f_shield_custom,  itmask)
+     &               iradtrans, kdissH2I, xH2shield, iH2shieldcustom,
+     &               f_shield_custom,  itmask,
+     &               icmbrec, hubble_z)
 
 !           Compute dedot and HIdot, the rates of change of de and HI
 !             (should add itmask to this call)
@@ -1098,8 +1101,9 @@ c -------------------------------------------------------------------
      &                h2dust, ncrn, ncrd1, ncrd2,
      &                t1, t2, tdef, logtem, indixe, 
      &                dom, coolunit, tbase1, xbase1, dx_cgs, c_ljeans,
-     &                iradtrans, kdissH2I, xH2shield, iH2shieldcustom, 
-     &                f_shield_custom, itmask)
+     &                iradtrans, kdissH2I, xH2shield, iH2shieldcustom,
+     &                f_shield_custom, itmask,
+     &                icmbrec, hubble_z)
 ! -------------------------------------------------------------------
 
       implicit NONE
@@ -1109,12 +1113,16 @@ c -------------------------------------------------------------------
 
       integer is, ie, nratec,
      &        in, jn, kn, ispecies, ithreebody, j, k,
-     &        ndratec, iH2shield, iradshield, iradtrans, 
-     &        iH2shieldcustom
+     &        ndratec, iH2shield, iradshield, iradtrans,
+     &        iH2shieldcustom, icmbrec
       real*8 temstart, temend, tgas1d(in), mmw(in), dom,
-     &       dtemstart, dtemend
+     &       dtemstart, dtemend, hubble_z
       real*8 coolunit, tbase1, xbase1, dx_cgs, c_ljeans
       logical itmask(in), anydust
+
+!     v2026 recfast-matched H recombination: locals for the Peebles C-factor
+      real*8 rec_T, rec_tt, rec_aB, rec_n1s, rec_CR, rec_CDB, rec_bet,
+     &       rec_lam, rec_K, rec_KL, rec_KB, rec_fu, rec_C, rec_pi
 
 !     Chemistry rates as a function of temperature
 
@@ -1240,6 +1248,44 @@ c -------------------------------------------------------------------
      &            (k58a(indixe(i)+1) -k58a(indixe(i)))*tdef(i)
       endif
       enddo
+
+!     v2026: recfast-matched H recombination.  Override k2 (HII+e->HI) with the
+!     RECFAST case-B alpha_B (Pequignot-Petitjean-Boisson 1991) times the Peebles
+!     C-factor C = (1+K.L.n1s)/(1/fu + K.L.n1s/fu + K.beta.n1s) -- the chance a
+!     recombined e- reaches the ground state before the CMB re-ionizes it out of
+!     n=2 (beta = n=2 photoionization; K = lambda_a^3/(8 pi H) Ly-alpha escape).
+!     Reverse ground-state Ly-alpha photoionization is exp(-CL/T)-suppressed and
+!     dropped (negligible z<1000).  SI constants; the k2 table stores
+!     alpha[cgs]/kunit with kunit = 1/(dom*tbase1).  fu is the RECFAST H fudge:
+!     it is a calibration of the *active* recombination epoch (z>1000); in the
+!     z<1000 tail it double-corrects, so the pure Peebles C-factor (fu=1) is used
+!     -- it reproduces the recfast x_e(z) table to ~1-6% for z<700 (fu=1.14
+!     under-recombines the tail by ~12% = 1/1.14).
+      if (icmbrec .gt. 0 .and. hubble_z .gt. 0.0_DKIND) then
+         rec_pi  = 3.14159265358979_DKIND
+         rec_CR  = 1.799920e14_DKIND
+         rec_CDB = 3.945150e4_DKIND
+         rec_lam = 1.215668e-7_DKIND
+         rec_fu  = 1.0_DKIND
+         do i = is+1, ie+1
+            if (itmask(i)) then
+               rec_T  = tgas1d(i)
+               rec_tt = rec_T/1.0e4_DKIND
+               rec_aB = 1.0e-19_DKIND*4.309_DKIND
+     &                * rec_tt**(-0.6166_DKIND)
+     &                / (1.0_DKIND+0.6703_DKIND*rec_tt**0.5300_DKIND)
+               rec_n1s = HI(i,j,k)*dom*1.0e6_DKIND
+               rec_bet = rec_aB*(rec_CR*rec_T)**1.5_DKIND
+     &                 * exp(-rec_CDB/rec_T)
+               rec_K  = rec_lam**3/(8.0_DKIND*rec_pi*hubble_z)
+               rec_KL = rec_K*8.2245809_DKIND*rec_n1s
+               rec_KB = rec_K*rec_bet*rec_n1s
+               rec_C  = (1.0_DKIND+rec_KL)
+     &                / (1.0_DKIND/rec_fu+rec_KL/rec_fu+rec_KB)
+               k2(i)  = rec_aB*1.0e6_DKIND*rec_C*dom*tbase1
+            endif
+         enddo
+      endif
 
 !     Look-up for 9-species model
 

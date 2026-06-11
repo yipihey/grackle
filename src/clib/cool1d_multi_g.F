@@ -129,14 +129,17 @@
 
 !  Locals
 
-      integer i, iter, ti, iradfield
+      integer i, iter, ti, iradfield, ixcmb
       real*8 dom, qq, vibl, logtem0, logtem9, dlogtem, zr,
-     &       comp1, comp2, 
+     &       comp1, comp2,
      &       hdlte1, hdlow1, gamma2, x, fudge, fH2,
      &       gphdl1, dom_inv, tau, ciefudge,
      &       coolunit, dbase1, tbase1, xbase1,
      &       nH2, nother, nSSh, nratio, nssh_he, nratio_he,
-     &       fSShHI, fSShHeI, pe_eps, pe_X, grbeta
+     &       fSShHI, fSShHeI, pe_eps, pe_X, grbeta,
+!      H2-cooling CMB floor (Lambda_H2(Tgas) - Lambda_H2(T_CMB)) scalars
+     &       logtcmb, tdcmb, gaHI_c, gaH2_c, gaHe_c, gaHp_c, gael_c,
+     &       h2lte_c, galdl_c, cool_gas, cool_cmb
 
 !  Slice locals
  
@@ -469,6 +472,23 @@
 
 #define USE_GLOVER_ABEL2008
 #ifdef USE_GLOVER_ABEL2008
+!        CMB floor for H2 line cooling: the CMB pumps the H2 rovibrational
+!        levels, so the net line cooling must vanish as Tgas -> T_CMB.  Grackle's
+!        H2 cooling function radiates into a 0 K background; subtract the same
+!        function evaluated at T_CMB (= comp2, constant over the slice) so the
+!        per-cell term becomes Lambda_H2(Tgas) - Lambda_H2(T_CMB).  Interpolate
+!        the cooling-rate coefficients at T_CMB once here.  Self-limiting: at low
+!        z, h2lte_c -> 0 (H2 levels unexcited at a few K), so no effect.
+         logtcmb = min(max(log(comp2), logtem0), logtem9)
+         ixcmb   = min(nratec-1,
+     &             max(1, int((logtcmb-logtem0)/dlogtem)+1))
+         tdcmb   = (logtcmb - (logtem0+(ixcmb-1)*dlogtem)) / dlogtem
+         gaHI_c  = gaHIa(ixcmb)  + tdcmb*(gaHIa(ixcmb+1) -gaHIa(ixcmb))
+         gaH2_c  = gaH2a(ixcmb)  + tdcmb*(gaH2a(ixcmb+1) -gaH2a(ixcmb))
+         gaHe_c  = gaHea(ixcmb)  + tdcmb*(gaHea(ixcmb+1) -gaHea(ixcmb))
+         gaHp_c  = gaHpa(ixcmb)  + tdcmb*(gaHpa(ixcmb+1) -gaHpa(ixcmb))
+         gael_c  = gaela(ixcmb)  + tdcmb*(gaela(ixcmb+1) -gaela(ixcmb))
+         h2lte_c = h2ltea(ixcmb) + tdcmb*(h2ltea(ixcmb+1)-h2ltea(ixcmb))
          do i = is+1, ie+1
             if ( itmask(i) ) then
             gaHI(i) = gaHIa(indixe(i)) + tdef(i)
@@ -512,15 +532,23 @@
             else
                 fudge = 1._DKIND
             endif
-            galdl(i) = gaHI(i) * HI(i,j,k)  
+            galdl(i) = gaHI(i) * HI(i,j,k)
      &               + gaH2(i) * H2I(i,j,k) / 2._DKIND
      &               + gaHe(i) * HeI(i,j,k) / 4._DKIND
      &               + gaHp(i) * HII(i,j,k)
      &               + gael(i) * de(i,j,k)
 c            gphdl1 = gphdl(i)/dom
             gphdl1 = h2lte(i)/dom
+            cool_gas = h2lte(i)/(1._DKIND + gphdl1/galdl(i))
+!           same cooling function evaluated at T_CMB (CMB floor; same densities)
+            galdl_c = gaHI_c * HI(i,j,k)
+     &              + gaH2_c * H2I(i,j,k) / 2._DKIND
+     &              + gaHe_c * HeI(i,j,k) / 4._DKIND
+     &              + gaHp_c * HII(i,j,k)
+     &              + gael_c * de(i,j,k)
+            cool_cmb = h2lte_c/(1._DKIND + (h2lte_c/dom)/galdl_c)
             edot(i) = edot(i) - real(ih2co, DKIND)*fudge*H2I(i,j,k)*
-     &           h2lte(i)/(1._DKIND + gphdl1/galdl(i)) / (2._DKIND*dom)
+     &           (cool_gas - cool_cmb) / (2._DKIND*dom)
 
             end if
          enddo

@@ -78,6 +78,25 @@ typedef struct
      7/10. 0) off (legacy advected), 1) on. */
   int equilibrium_h2_intermediates;
 
+  /* "v2026" recfast-matched primordial hydrogen recombination.  When on, the
+     HII+e->HI recombination coefficient k2 is replaced, cell by cell, with the
+     RECFAST case-B alpha_B (Pequignot-Petitjean-Boisson 1991) times the Peebles
+     C-factor — the probability a recombined electron reaches the ground state
+     before the CMB re-ionizes it out of n=2 (the n=2 photoionization + 2-photon
+     / Lyman-alpha-escape bottleneck, with the RECFAST fudge 1.14).  This is the
+     ONE piece of recombination physics Grackle's network lacks vs RECFAST, so
+     with it Grackle reproduces the recfast recombination history for z<1000 and
+     can be started near recombination.  Needs the cosmology below (for H(z) in
+     the Sobolev escape K=lambda_alpha^3/(8 pi H)).  0) off, 1) on. */
+  int cmb_recombination;
+
+  /* Cosmology for the C-factor's H(z) (only used when cmb_recombination>0).
+     H0 in km/s/Mpc; Omega_radiation is derived internally from T_cmb=2.725 K
+     (photons + 3 neutrinos).  H(z)=H0*sqrt(Or(1+z)^4+Om(1+z)^3+Ok(1+z)^2+OL). */
+  double cosmology_hubble_constant_now;
+  double cosmology_omega_matter_now;
+  double cosmology_omega_lambda_now;
+
   /* adiabatic index */
   double Gamma;
 

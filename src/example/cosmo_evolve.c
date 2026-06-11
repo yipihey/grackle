@@ -42,12 +42,16 @@ int main(void)
   set_default_chemistry_parameters(cd);
   grackle_data->use_grackle = 1;
   grackle_data->with_radiative_cooling = 1;
-  grackle_data->primordial_chemistry = 3;   /* H, He, e, H-, H2, H2+, D, D+, HD */
+  grackle_data->primordial_chemistry = atoi(getenv("PC")?getenv("PC"):"3"); /* PC=1 -> no molecules (cooling diagnostic) */
   grackle_data->metal_cooling = 0;
   grackle_data->dust_chemistry = 0;
   grackle_data->UVbackground = 0;
-  grackle_data->cmb_dissociation = 1;        /* CMB H-/H2+ photo-destruction (our rates) */
+  grackle_data->cmb_dissociation = atoi(getenv("CMBDISS")?getenv("CMBDISS"):"1"); /* CMB H-/H2+ photo-destruction */
   grackle_data->equilibrium_h2_intermediates = atoi(getenv("EQUIL")?getenv("EQUIL"):"0"); /* v2026 */
+  grackle_data->cmb_recombination = atoi(getenv("CMBREC")?getenv("CMBREC"):"1"); /* Peebles C-factor */
+  grackle_data->cosmology_hubble_constant_now = 71.0;   /* km/s/Mpc (for H(z) in the C-factor) */
+  grackle_data->cosmology_omega_matter_now    = 0.27;
+  grackle_data->cosmology_omega_lambda_now    = 0.73;
   grackle_data->grackle_data_file = "../../input/CloudyData_noUVB.h5";
   if (initialize_chemistry_data(&u) == 0) { fprintf(stderr,"init failed\n"); return 1; }
 
@@ -75,7 +79,8 @@ int main(void)
   dens[0] = rho_tot/u.density_units;
   HI[0]   = (1.0-xe)*XH*dens[0];  HII[0] = xe*XH*dens[0];  e[0] = xe*XH*dens[0];
   HeI[0]  = (1.0-XH)*dens[0];     HeII[0]=tiny*dens[0]; HeIII[0]=tiny*dens[0];
-  HM[0]=tiny*dens[0]; H2I[0]=tiny*dens[0]; H2II[0]=tiny*dens[0];
+  /* seed x_H2 = n(H2)/n_H = 1e-15  (H2I is the H2 mass density = 2*n(H2)). */
+  HM[0]=tiny*dens[0]; H2I[0]=2.0e-15*XH*dens[0]; H2II[0]=tiny*dens[0];
   DI[0]=(1.0-xe)*DtoH*XH*dens[0]; DII[0]=xe*DtoH*XH*dens[0]; HDI[0]=tiny*dens[0]; Z[0]=tiny*dens[0];
   double Tunits = get_temperature_units(&u), mu = 1.22;
   ie[0] = T / Tunits / (5.0/3.0-1.0) / mu;

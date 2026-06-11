@@ -87,7 +87,8 @@ extern void FORTRAN_NAME(solve_rate_cool_g)(
         int *iVheat, int *iMheat, gr_float *Vheat, gr_float *Mheat,
         int *iisrffield, gr_float* isrf_habing, 
         int *iH2shieldcustom, gr_float* f_shield_custom,
-        int *itmax, int *exititmax);
+        int *itmax, int *exititmax,
+        int *icmbrec, double *hubble_z);
 
 int local_solve_chemistry(chemistry_data *my_chemistry,
                           chemistry_data_storage *my_rates,
@@ -140,18 +141,41 @@ int local_solve_chemistry(chemistry_data *my_chemistry,
   /* CMB-blackbody photo-destruction of the H2-formation intermediaries.
      At high z the UV-background k27/k28 vanish, but the CMB itself
      photo-detaches H- and photo-dissociates H2+, limiting H2 formation.
-     Added (in CGS s^-1, the same units as the UV-background contribution)
-     to k27/k28 as a function of the CMB temperature T_rad = 2.73*(1+z).
+     Computed in CGS s^-1 as a function of the CMB temperature T_rad=2.73*(1+z),
+     then CONVERTED TO CODE UNITS by *time_units, exactly as the UV-background
+     photo-rates are (update_UVbackground_rates.c: k27 *= time_units) -- the
+     Fortran solver adds k27/k28 to the H-/H2+ destruction in code time units
+     (cf. cool1d k24/tbase1 recovers CGS).  Omitting this factor made the CMB
+     dissociation ~time_units(~1e13)x too weak (H-/H2+ barely suppressed).
      Galli & Palla (1998); the H2+ rate is the LTE form because the CMB keeps
      the H2+ vibrational levels thermally excited. */
   if (my_chemistry->cmb_dissociation > 0 &&
       my_chemistry->primordial_chemistry > 1) {
     double a_tot = my_units->a_value * my_units->a_units;
     double Trad = (a_tot > 0.0) ? 2.73 / a_tot : 2.73;   /* = 2.73*(1+z) [K] */
+    double tu = my_units->time_units;                    /* CGS s^-1 -> code units */
     /* H-  + g_CMB -> H + e    (GP98 H4; de Jong 1972) */
-    my_uvb_rates.k27 += 1.1e-1 * pow(Trad, 2.13) * exp(-8823.0 / Trad);
+    my_uvb_rates.k27 += 1.1e-1 * pow(Trad, 2.13) * exp(-8823.0 / Trad) * tu;
     /* H2+ + g_CMB -> H + H+   (GP98 H9, LTE; Argyros 1974 / Stancil 1994) */
-    my_uvb_rates.k28 += 1.63e7 * exp(-32400.0 / Trad);
+    my_uvb_rates.k28 += 1.63e7 * exp(-32400.0 / Trad) * tu;
+  }
+
+  /* v2026 recfast-matched H recombination: the per-cell Peebles C-factor (in the
+     Fortran kernel) needs H(z) for the Sobolev escape K=lambda_alpha^3/(8 pi H).
+     Compute it here from the supplied cosmology (a_value -> z; H0, Om, OL; the
+     radiation density from T_cmb=2.725 K photons + 3 neutrinos), in CGS s^-1. */
+  int cmb_recombination = my_chemistry->cmb_recombination;
+  double hubble_z = 0.0;
+  if (cmb_recombination > 0) {
+    double a_tot = my_units->a_value * my_units->a_units;     /* = 1/(1+z) */
+    double zp1   = (a_tot > 0.0) ? 1.0 / a_tot : 1.0;
+    double H0    = my_chemistry->cosmology_hubble_constant_now * 1.0e5 / 3.0856775807e24; /* km/s/Mpc -> 1/s */
+    double hh    = my_chemistry->cosmology_hubble_constant_now / 100.0;
+    double Or    = (hh > 0.0) ? 4.15e-5 / (hh * hh) : 0.0;    /* photons+3nu, T_cmb=2.725 K */
+    double Om    = my_chemistry->cosmology_omega_matter_now;
+    double OL    = my_chemistry->cosmology_omega_lambda_now;
+    double Ok    = 1.0 - Om - OL - Or;
+    hubble_z = H0 * sqrt(Or*pow(zp1,4) + Om*pow(zp1,3) + Ok*zp1*zp1 + OL);
   }
 
   /* Check for a metal field. */
@@ -386,7 +410,8 @@ int local_solve_chemistry(chemistry_data *my_chemistry,
     &my_chemistry->H2_custom_shielding,
     my_fields->H2_custom_shielding_factor,
     &my_chemistry->max_iterations,
-    &my_chemistry->exit_after_iterations_exceeded);
+    &my_chemistry->exit_after_iterations_exceeded,
+    &cmb_recombination, &hubble_z);
 
   if (ierr == FAIL) {
     fprintf(stderr, "Error in solve_rate_cool_g.\n");
