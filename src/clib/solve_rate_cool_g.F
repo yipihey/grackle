@@ -5,8 +5,8 @@
 
       subroutine solve_rate_cool_g(icool, d, e, u, v, w, de,
      &                HI, HII, HeI, HeII, HeIII,
-     &                in, jn, kn, nratec, iexpand, 
-     &                ispecies, imetal, imcool, idust,
+     &                in, jn, kn, nratec, iexpand,
+     &                ispecies, ieq, imetal, imcool, idust,
      &                idustall, idustfield, idim,
      &                is, js, ks, ie, je, ke, ih2co, ipiht, idustrec,
      &                igammah,
@@ -164,7 +164,7 @@
 !  General Arguments
 
       integer icool, in, jn, kn, is, js, ks, ie, je, ke, nratec, 
-     &        iexpand, ih2co, ipiht, ispecies, imetal, idim,
+     &        iexpand, ih2co, ipiht, ispecies, ieq, imetal, idim,
      &        ierr, imcool, idust, idustall, idustfield, idustrec,
      &        igammah, ih2optical, iciecool, ithreebody,
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
@@ -780,7 +780,7 @@
             call step_rate_g(de, HI, HII, HeI, HeII, HeIII, d,
      &                     HM, H2I, H2II, DI, DII, HDI, dtit,
      &                     in, jn, kn, is, ie, j, k,
-     &                     ispecies, anydust,
+     &                     ispecies, ieq, anydust,
      &                     k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, k11,
      &                     k12, k13, k14, k15, k16, k17, k18, k19, k22,
      &                     k24, k25, k26, k27, k28, k29, k30,
@@ -1960,7 +1960,8 @@ c
 
       subroutine step_rate_g(de, HI, HII, HeI, HeII, HeIII, d,
      &                     HM, H2I, H2II, DI, DII, HDI, dtit,
-     &                     in, jn, kn, is, ie, j, k, ispecies, anydust,
+     &                     in, jn, kn, is, ie, j, k, ispecies,
+     &                     ieq, anydust,
      &                     k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, k11,
      &                     k12, k13, k14, k15, k16, k17, k18, k19, k22,
      &                     k24, k25, k26, k27, k28, k29, k30,
@@ -1981,7 +1982,7 @@ c -------------------------------------------------------------------
 
 !     arguments
 
-      integer ispecies, in, jn, kn, is, ie, j, k,
+      integer ispecies, ieq, in, jn, kn, is, ie, j, k,
      &        iradtrans, irt_honly
       real*8 dtit(in), dedot_prev(in), HIdot_prev(in)
       logical itmask(in), anydust
@@ -2284,8 +2285,15 @@ c --- (C) Now do extra 3-species for molecular hydrogen ---
      &              (k16(i) + k17(i))  * HII(i,j,k) +  
      &	            k14(i) * de(i,j,k) + k19(i) * H2II(i,j,k)/2.0 +
      &	            k27
-            HMp(i) = (scoef*dtit(i) + HM(i,j,k))
-     &           / (1.0 + acoef*dtit(i))
+            if (ieq .eq. 1) then
+!              v2026 reduced network: H- is an algebraic equilibrium
+!              intermediary (always in equilibrium), like H2+ below — does
+!              not use/advect HM, so the host need not carry it.
+               HMp(i) = scoef / max(acoef, tiny)
+            else
+               HMp(i) = (scoef*dtit(i) + HM(i,j,k))
+     &              / (1.0 + acoef*dtit(i))
+            endif
 
 
 !           9) H2+

@@ -47,6 +47,7 @@ int main(void)
   grackle_data->dust_chemistry = 0;
   grackle_data->UVbackground = 0;
   grackle_data->cmb_dissociation = 1;        /* CMB H-/H2+ photo-destruction (our rates) */
+  grackle_data->equilibrium_h2_intermediates = atoi(getenv("EQUIL")?getenv("EQUIL"):"0"); /* v2026 */
   grackle_data->grackle_data_file = "../../input/CloudyData_noUVB.h5";
   if (initialize_chemistry_data(&u) == 0) { fprintf(stderr,"init failed\n"); return 1; }
 

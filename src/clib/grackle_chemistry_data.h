@@ -69,6 +69,15 @@ typedef struct
      0) off, 1) on. */
   int cmb_dissociation;
 
+  /* "v2026" reduced primordial network: treat H- and H2+ as algebraic
+     equilibrium intermediaries (always in equilibrium — verified across the
+     full n,T,z range) instead of advected rate-equation species. The solver
+     computes them from the pure equilibrium balance (H2+ already is; this also
+     makes H- pure-equilibrium and robust when not advected), so the host code
+     (Enzo) need not advect HM/H2II — reducing the 9/12-species advected set to
+     7/10. 0) off (legacy advected), 1) on. */
+  int equilibrium_h2_intermediates;
+
   /* adiabatic index */
   double Gamma;
 
