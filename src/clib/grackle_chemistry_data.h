@@ -60,6 +60,15 @@ typedef struct
      0) no, 1) yes */
   int cmb_temperature_floor;
 
+  /* Include the CMB-blackbody photo-destruction of the H2-formation
+     intermediaries H- and H2+, which dominate at high redshift (z >~ 100)
+     where the UV-background k27/k28 vanish and limit H2 formation:
+       H-  + g_CMB -> H + e    (Galli & Palla 1998, de Jong 1972)
+       H2+ + g_CMB -> H + H+   (Galli & Palla 1998; LTE, Argyros 1974 / Stancil 1994)
+     Requires primordial_chemistry > 1 (needs the H-, H2+ species).
+     0) off, 1) on. */
+  int cmb_dissociation;
+
   /* adiabatic index */
   double Gamma;
 

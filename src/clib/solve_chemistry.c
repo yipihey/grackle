@@ -136,6 +136,23 @@ int local_solve_chemistry(chemistry_data *my_chemistry,
     my_uvb_rates.temp_xray = my_rates->temp_xray;
   }
 
+  /* CMB-blackbody photo-destruction of the H2-formation intermediaries.
+     At high z the UV-background k27/k28 vanish, but the CMB itself
+     photo-detaches H- and photo-dissociates H2+, limiting H2 formation.
+     Added (in CGS s^-1, the same units as the UV-background contribution)
+     to k27/k28 as a function of the CMB temperature T_rad = 2.73*(1+z).
+     Galli & Palla (1998); the H2+ rate is the LTE form because the CMB keeps
+     the H2+ vibrational levels thermally excited. */
+  if (my_chemistry->cmb_dissociation > 0 &&
+      my_chemistry->primordial_chemistry > 1) {
+    double a_tot = my_units->a_value * my_units->a_units;
+    double Trad = (a_tot > 0.0) ? 2.73 / a_tot : 2.73;   /* = 2.73*(1+z) [K] */
+    /* H-  + g_CMB -> H + e    (GP98 H4; de Jong 1972) */
+    my_uvb_rates.k27 += 1.1e-1 * pow(Trad, 2.13) * exp(-8823.0 / Trad);
+    /* H2+ + g_CMB -> H + H+   (GP98 H9, LTE; Argyros 1974 / Stancil 1994) */
+    my_uvb_rates.k28 += 1.63e7 * exp(-32400.0 / Trad);
+  }
+
   /* Check for a metal field. */
 
   int metal_field_present = TRUE;

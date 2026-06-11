@@ -57,6 +57,10 @@ ENTRY(grackle_data_file, STRING, "")
    0) no, 1) yes */
 ENTRY(cmb_temperature_floor, INT, 1)
 
+/* Include CMB-blackbody photo-destruction of H- and H2+ (high-z H2 limiter)
+   0) off, 1) on */
+ENTRY(cmb_dissociation, INT, 0)
+
 /* adiabatic index */
 ENTRY(Gamma, DOUBLE, 5./3.)
 
