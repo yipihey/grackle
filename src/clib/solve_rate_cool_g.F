@@ -48,7 +48,7 @@
      &                iisrffield, isrf_habing, 
      &                iH2shieldcustom, f_shield_custom,
      &                itmax, exititmax,
-     &                icmbrec, hubble_z)
+     &                icmbrec, hubble_z, ineutralhe)
 
 !
 !  SOLVE MULTI-SPECIES RATE EQUATIONS AND RADIATIVE COOLING
@@ -171,7 +171,7 @@
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
      &        iradtrans, iradcoupled, iradstep, irt_honly,
      &        iisrffield, iH2shieldcustom, itmax, exititmax,
-     &        icmbrec
+     &        icmbrec, ineutralhe
 
       real*8  dx, dt, aye, temstart, temend, gamma,
      &        utim, uxyz, uaye, urho, utem, fh, dtoh, z_solar,
@@ -316,6 +316,9 @@
 !  Iteration mask
 
       logical itmask(in), anydust
+      logical he_warned
+      save he_warned
+      data he_warned /.false./
 !
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
@@ -360,6 +363,29 @@
      &                     HM, H2I, H2II, DI, DII, HDI, metal,
      &                     is, ie, js, je, ks, ke,
      &                     in, jn, kn, ispecies, imetal)
+
+!     v2026 neutral-helium minimal network: helium entirely neutral so the only
+!     INDEPENDENT species are HII and H2I.  Helium is forced neutral every
+!     subcycle in step_rate_g (HeII=HeIII=0, HeI=(1-fh)*rho), and the existing
+!     charge-conservation step then yields de=HII (n_e=n_HII).  Reconstruct HI
+!     from H conservation (HI = fh*rho - HII - H2I) so a host need not advect it;
+!     this is a no-op when HI is advected (it already equals that), and lets the
+!     advected set shrink to {HII, H2I}.  Cold gas only -- a one-time T>1e4 K
+!     warning is printed below.
+      if (ineutralhe .gt. 0) then
+         do k = ks, ke
+         do j = js, je
+         do i = is, ie
+            if (ispecies .gt. 1) then
+               HI(i,j,k) = max(fh*d(i,j,k)-HII(i,j,k)-H2I(i,j,k),
+     &                         tiny)
+            else
+               HI(i,j,k) = max(fh*d(i,j,k)-HII(i,j,k), tiny)
+            endif
+         enddo
+         enddo
+         enddo
+      endif
 
 
 !  Loop over zones, and do an entire i-column in one go
@@ -500,6 +526,28 @@
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
      &                iisrffield, isrf_habing, itmask)
+
+!           v2026 neutral-helium: warn once if the gas is hotter than the
+!           "He all neutral, n_e=n_HII" approximation allows (above ~1e4 K
+!           helium ionizes and electrons no longer equal protons).
+            if (ineutralhe .gt. 0 .and. (.not. he_warned)) then
+               do i = is+1, ie+1
+                  if (itmask(i) .and. tgas(i) .gt. 1.0e4_DKIND) then
+#ifdef _OPENMP
+!$omp critical
+#endif
+                     if (.not. he_warned) then
+                        write(0,*) 'GRACKLE WARNING: neutral_helium ',
+     &                  'chemistry unreliable for T > 1e4 K (T=',
+     &                  tgas(i), ' K); He ionizes, n_e != n_HII.'
+                        he_warned = .true.
+                     endif
+#ifdef _OPENMP
+!$omp end critical
+#endif
+                  endif
+               enddo
+            endif
 
             if (ispecies .gt. 0) then
 
@@ -794,9 +842,9 @@
      &                     HIp, HIIp, HeIp, HeIIp, HeIIIp, dep,
      &                     HMp, H2Ip, H2IIp, DIp, DIIp, HDIp,
      &                     dedot_prev, HIdot_prev,
-     &                     iradtrans, irt_honly, 
+     &                     iradtrans, irt_honly,
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask)
+     &                     itmask, ineutralhe, fh)
 
             endif
 
@@ -2020,7 +2068,7 @@ c
      &                     dedot_prev, HIdot_prev,
      &                     iradtrans, irt_honly,
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask)
+     &                     itmask, ineutralhe, fh)
 c -------------------------------------------------------------------
 
       implicit NONE
@@ -2029,8 +2077,8 @@ c -------------------------------------------------------------------
 !     arguments
 
       integer ispecies, ieq, in, jn, kn, is, ie, j, k,
-     &        iradtrans, irt_honly
-      real*8 dtit(in), dedot_prev(in), HIdot_prev(in)
+     &        iradtrans, irt_honly, ineutralhe
+      real*8 dtit(in), dedot_prev(in), HIdot_prev(in), fh
       logical itmask(in), anydust
 
 !     Density fields
@@ -2421,9 +2469,18 @@ c
      &           max(real(dtit(i), DKIND), tiny8)
          HI(i,j,k)    = max(real(HIp(i), RKIND), tiny)
          HII(i,j,k)   = max(real(HIIp(i), RKIND), tiny)
-         HeI(i,j,k)   = max(real(HeIp(i), RKIND), tiny)
-         HeII(i,j,k)  = max(real(HeIIp(i), RKIND), tiny)
-         HeIII(i,j,k) = max(real(HeIIIp(i), RKIND), 1e-5_RKIND*tiny)
+         if (ineutralhe .gt. 0) then
+!           v2026: force helium entirely neutral (discard the He chemistry); the
+!           charge-conservation step below then yields de = HII (n_e = n_HII).
+            HeI(i,j,k)   = (1._RKIND - fh) * d(i,j,k)
+            HeII(i,j,k)  = tiny
+            HeIII(i,j,k) = tiny
+         else
+            HeI(i,j,k)   = max(real(HeIp(i), RKIND), tiny)
+            HeII(i,j,k)  = max(real(HeIIp(i), RKIND), tiny)
+            HeIII(i,j,k) = max(real(HeIIIp(i), RKIND),
+     &                         1e-5_RKIND*tiny)
+         endif
 
 !        de(i,j,k)    = dep(i)
 

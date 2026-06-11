@@ -78,6 +78,17 @@ typedef struct
      7/10. 0) off (legacy advected), 1) on. */
   int equilibrium_h2_intermediates;
 
+  /* "v2026" minimal cold-primordial network: assume helium is entirely neutral.
+     When on, the chemistry forces HeII=HeIII=0 and HeI=(1-X_H)*rho every step,
+     reconstructs HI=X_H*rho-HII-H2I, and (via the existing charge-conservation
+     step) sets the electron density equal to the proton density (n_e=n_HII).
+     Combined with equilibrium_h2_intermediates, the only INDEPENDENT fields are
+     HII and H2I, so a host need advect just two scalars (plus rho and energy) --
+     a large memory saving for big cosmological runs.  Valid only for cold gas:
+     above ~1e4 K helium ionizes and n_e!=n_HII, so the solver prints a one-time
+     warning that the chemistry is unreliable there.  0) off, 1) on. */
+  int neutral_helium;
+
   /* "v2026" recfast-matched primordial hydrogen recombination.  When on, the
      HII+e->HI recombination coefficient k2 is replaced, cell by cell, with the
      RECFAST case-B alpha_B (Pequignot-Petitjean-Boisson 1991) times the Peebles
