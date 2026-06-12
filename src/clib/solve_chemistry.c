@@ -88,7 +88,7 @@ extern void FORTRAN_NAME(solve_rate_cool_g)(
         int *iisrffield, gr_float* isrf_habing, 
         int *iH2shieldcustom, gr_float* f_shield_custom,
         int *itmax, int *exititmax,
-        int *icmbrec, double *hubble_z, int *ineutralhe);
+        int *icmbrec, double *hubble_z, int *ineutralhe, int *ideut);
 
 int local_solve_chemistry(chemistry_data *my_chemistry,
                           chemistry_data_storage *my_rates,
@@ -411,7 +411,8 @@ int local_solve_chemistry(chemistry_data *my_chemistry,
     my_fields->H2_custom_shielding_factor,
     &my_chemistry->max_iterations,
     &my_chemistry->exit_after_iterations_exceeded,
-    &cmb_recombination, &hubble_z, &my_chemistry->neutral_helium);
+    &cmb_recombination, &hubble_z, &my_chemistry->neutral_helium,
+    &my_chemistry->equilibrium_deuterium);
 
   if (ierr == FAIL) {
     fprintf(stderr, "Error in solve_rate_cool_g.\n");

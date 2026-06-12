@@ -89,6 +89,16 @@ typedef struct
      warning that the chemistry is unreliable there.  0) off, 1) on. */
   int neutral_helium;
 
+  /* "v2026" reduced deuterium: advect only HD and reconstruct D, D+.  D+ is
+     locked to H+ by the fast resonant charge exchange D + H+ <-> D+ + H, so when
+     on the solver makes D+ a pure equilibrium (charge-exchange balance) and
+     reconstructs D = dtoh*(HI+HII+H2I) - D+ - (2/3)*HD from deuterium
+     conservation; HD (HDI) stays advected (it accumulates, like H2).  This lets
+     a host carry ONE extra species (HDI) to get the HD abundance -- and thus HD
+     line cooling, which reaches below the H2 floor toward T_CMB -- correct.
+     Requires primordial_chemistry = 3.  0) off, 1) on. */
+  int equilibrium_deuterium;
+
   /* "v2026" recfast-matched primordial hydrogen recombination.  When on, the
      HII+e->HI recombination coefficient k2 is replaced, cell by cell, with the
      RECFAST case-B alpha_B (Pequignot-Petitjean-Boisson 1991) times the Peebles

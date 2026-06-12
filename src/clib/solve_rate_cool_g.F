@@ -48,7 +48,7 @@
      &                iisrffield, isrf_habing, 
      &                iH2shieldcustom, f_shield_custom,
      &                itmax, exititmax,
-     &                icmbrec, hubble_z, ineutralhe)
+     &                icmbrec, hubble_z, ineutralhe, ideut)
 
 !
 !  SOLVE MULTI-SPECIES RATE EQUATIONS AND RADIATIVE COOLING
@@ -171,7 +171,7 @@
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
      &        iradtrans, iradcoupled, iradstep, irt_honly,
      &        iisrffield, iH2shieldcustom, itmax, exititmax,
-     &        icmbrec, ineutralhe
+     &        icmbrec, ineutralhe, ideut
 
       real*8  dx, dt, aye, temstart, temend, gamma,
      &        utim, uxyz, uaye, urho, utem, fh, dtoh, z_solar,
@@ -382,6 +382,23 @@
             else
                HI(i,j,k) = max(fh*d(i,j,k)-HII(i,j,k), tiny)
             endif
+         enddo
+         enddo
+         enddo
+      endif
+
+!     v2026 reduced deuterium: advect only HD and reconstruct D from deuterium
+!     conservation -- total D mass = dtoh*(total H mass); D = that - D+ - (2/3)HD
+!     (HD mass = 3, of which 2 is the D).  D+ is re-imposed each subcycle in
+!     step_rate_g as the charge-exchange equilibrium with H+.  Cheap H sum (HI,
+!     HII, H2I) dominates the H budget.
+      if (ideut .gt. 0 .and. ispecies .gt. 2) then
+         do k = ks, ke
+         do j = js, je
+         do i = is, ie
+            DI(i,j,k) = max(dtoh*(HI(i,j,k)+HII(i,j,k)+H2I(i,j,k))
+     &                   - DII(i,j,k) - (2._DKIND/3._DKIND)*HDI(i,j,k),
+     &                   tiny)
          enddo
          enddo
          enddo
@@ -844,7 +861,7 @@
      &                     dedot_prev, HIdot_prev,
      &                     iradtrans, irt_honly,
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask, ineutralhe, fh)
+     &                     itmask, ineutralhe, fh, ideut)
 
             endif
 
@@ -2068,7 +2085,7 @@ c
      &                     dedot_prev, HIdot_prev,
      &                     iradtrans, irt_honly,
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask, ineutralhe, fh)
+     &                     itmask, ineutralhe, fh, ideut)
 c -------------------------------------------------------------------
 
       implicit NONE
@@ -2077,7 +2094,7 @@ c -------------------------------------------------------------------
 !     arguments
 
       integer ispecies, ieq, in, jn, kn, is, ie, j, k,
-     &        iradtrans, irt_honly, ineutralhe
+     &        iradtrans, irt_honly, ineutralhe, ideut
       real*8 dtit(in), dedot_prev(in), HIdot_prev(in), fh
       logical itmask(in), anydust
 
@@ -2441,8 +2458,15 @@ c
      &            +    k51(i) * HI(i,j,k)
      &            +    k52(i) * H2I(i,j,k)/2._DKIND
 
-            DIIp(i)   = ( scoef*dtit(i) + DII(i,j,k) )
+            if (ideut .eq. 1) then
+!              v2026 reduced deuterium: D+ is a pure equilibrium, locked to H+ by
+!              the fast charge exchange (k50 forms, k51/k2 destroy) -- so the host
+!              need not advect it (mirrors the H- equilibrium above).
+               DIIp(i) = scoef / max(acoef, tiny)
+            else
+               DIIp(i)   = ( scoef*dtit(i) + DII(i,j,k) )
      &                 / ( 1._DKIND + acoef*dtit(i) )
+            endif
 
 !          3) HDI
 c 

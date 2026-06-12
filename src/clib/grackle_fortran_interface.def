@@ -91,6 +91,7 @@ c     This is the fortran definition of grackle_chemistry_data
          INTEGER(C_INT) :: cmb_dissociation
          INTEGER(C_INT) :: equilibrium_h2_intermediates
          INTEGER(C_INT) :: neutral_helium
+         INTEGER(C_INT) :: equilibrium_deuterium
          INTEGER(C_INT) :: cmb_recombination
          REAL(C_DOUBLE) :: cosmology_hubble_constant_now
          REAL(C_DOUBLE) :: cosmology_omega_matter_now

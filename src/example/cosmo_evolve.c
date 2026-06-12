@@ -50,6 +50,7 @@ int main(void)
   grackle_data->equilibrium_h2_intermediates = atoi(getenv("EQUIL")?getenv("EQUIL"):"0"); /* v2026 */
   grackle_data->cmb_recombination = atoi(getenv("CMBREC")?getenv("CMBREC"):"1"); /* Peebles C-factor */
   grackle_data->neutral_helium = atoi(getenv("HE")?getenv("HE"):"0"); /* HE=1: He all neutral, n_e=n_HII */
+  grackle_data->equilibrium_deuterium = atoi(getenv("DEUT")?getenv("DEUT"):"0"); /* DEUT=1: advect only HD */
   grackle_data->cosmology_hubble_constant_now = 71.0;   /* km/s/Mpc (for H(z) in the C-factor) */
   grackle_data->cosmology_omega_matter_now    = 0.27;
   grackle_data->cosmology_omega_lambda_now    = 0.73;
